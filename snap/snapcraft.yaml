@@ -1,5 +1,5 @@
-
-
+#https://github.com/gohugoio/hugo/blob/master/snap/snapcraft.yaml
+---
 name: tenv
 summary: Version manager for OpenTofu, Terraform and Terragrunt, written in Go.
 description: |
@@ -13,32 +13,54 @@ version: git
 base: core22
 confinement: devmode #strict
 parts:
+  git:
+    plugin: nil
+    stage-packages:
+      - git
+    prime:
+      - usr/bin/git
+      - usr/lib
+  go:
+    plugin: nil
+    stage-snaps:
+      - go/1.22/stable
+    prime:
+      - bin/go
+      - pkg/tool
+      - -pkg/tool/*
+
   tenv:
-    plugin: go
+    plugin: nil
     source: .
-    build-snaps: [ go ]
-    build-packages: [ pkg-config, libzstd-dev ]
-    build-environment:
-      - CGO_ENABLED: 0
-      - CGO_LDFLAGS_ALLOW: ".*"
-#  tenv:
-#    plugin: go
-#    source-type: git
-#    source: https://github.com/get-woke/woke
-#    override-pull: |
-#      snapcraftctl pull
-#      snapcraftctl set-version \
-#      "$(git describe --long --tags --always --match=v*.*.* | sed 's/v//')"
+    after:
+      - git
+      - go
+    override-build: |
+      export CGO_ENABLED=0
+      export CGO_LDFLAGS_ALLOW=".*"
+      
+      go mod tidy
+      go test ./...
+      go get -u ./cmd/tenv
+      go get -u ./cmd/tofu
+      go get -u ./cmd/terraform
+      go get -u ./cmd/terragrunt
+      go get -u ./cmd/tf
+      go build -v -s -w -X main.version={{.Tag}}
+      
+      snapcraftctl build
+      
+
 apps:
   tenv:
     command: cmd/tenv
     plugs:
       - home
-      - dot-config-woke
-      - network
+      - network-bind
       - removable-media
-  golang-classic-example:
-    command: bin/main
+      - etc-gitconfig
+      - gitconfig
+      - ssh-keys
 
 grade: devel #stable
 architectures:
